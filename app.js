@@ -2,6 +2,8 @@ const Registration = require("./models/Registration");
 const User = require("./models/User");
 const PaymentDetail = require("./models/PaymentDetail");
 const Paper=require("./models/Paper");
+const PaperAttendance=require("./models/PaperAttendance");
+const WorkshopAttendance=require("./models/WorkshopAttendance")
 
 const express = require("express");
 const mongoose=require("mongoose");
@@ -311,6 +313,219 @@ app.get("/ppparticipants/:id",async(req,res)=>{
      res.status(500).json({ error: error.message });
    }
    })
+
+app.get("/populatepaper/:id",async (req,res)=>{
+  try{
+    const attendees = await Paper.find({paperId:req.params.id});
+    console.log(attendees);
+    for (const attendee of attendees)
+    {
+      const user=await User.findOne({email:attendee.email})
+      if(user)
+      {
+        const doc=new PaperAttendance({
+          eventId:req.params.id,
+          email:user.email,
+        })
+        doc.save()
+      }
+      
+    }
+    res.status(200).json({message:"SUCCESS"})
+  }
+  catch(e){
+    console.log(e);
+    res.status(500).json({error:e.message});
+  }
+})
+
+app.get("/populateworkshop/:id",async (req,res)=>{
+  try{
+    const attendees = await PaymentDetail.find({eventId:req.params.id,type:"WORKSHOP",status:"SUCCESS"});
+    for (const attendee of attendees)
+    {
+      const user=await User.findOne({email:attendee.email})
+      if(user)
+      {
+        const doc=new WorkshopAttendance({
+          eventId:req.params.id,
+          email:user.email,
+        })
+        doc.save()
+      }
+      
+    }
+    res.status(200).json({message:"SUCCESS"})
+  }
+  catch(e){
+    console.log(e);
+    res.status(500).json({error:e.message});
+  }
+})
+
+app.get("/attendeesworkshop/:id",async(req,res)=>{
+  let ws=[];
+  try{
+    const attendees=await WorkshopAttendance.find({eventId:req.params.id,attended:true});
+    for(const attendee of attendees)
+    {
+      const user=await User.findOne({email:attendee.email});
+      if(user)
+      {
+        ws.push({
+          kriyaId:user.kriyaId,
+          name:user.name,
+          email:user.name,
+          phone:user.phone,
+          attendedAt:attendee.attendedAt
+      });
+      }
+    }
+    res.status(200).json(ws);
+  }
+  catch(e)
+  {
+    console.log(e);
+    res.status(500).json({error:e.message});
+  }
+})
+
+app.get("/attendeespaper/:id",async(req,res)=>{
+  let ws=[];
+  try{
+    const attendees=await PaperAttendance.find({eventId:req.params.id,attended:true});
+    for(const attendee of attendees)
+    {
+      const user=await User.findOne({email:attendee.email});
+      if(user)
+      {
+        ws.push({
+          kriyaId:user.kriyaId,
+          name:user.name,
+          email:user.name,
+          phone:user.phone,
+          attendedAt:attendee.attendedAt
+      });
+      }
+    }
+    res.status(200).json(ws);
+  }
+  catch(e)
+  {
+    console.log(e);
+    res.status(500).json({error:e.message});
+  }
+})
+
+app.post("/attendws", async (req, res) => {
+  try {
+    const { eventId, kriyaId } = req.body;
+    const user = await User.findOne({ kriyaId: `KRIYA${kriyaId}` });
+    if (!user) return res.status(404).json({ message: "User not found!" });
+    const ws = await WorkshopAttendance.findOneAndUpdate(
+      {
+        eventId: eventId,
+        email: user.email,
+      },
+      {
+        attended: true,
+        attendedAt: new Date(),
+      },
+      { new: true }
+    );
+    if (!ws) {
+      const ws = await WorkshopAttendance.create({
+        eventId: eventId,
+        email: user.email,
+        attended: true,
+        attendedAt: new Date(),
+      });
+      return res.status(200).json({ ws, success: true });
+    }
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/attend-falsews", async (req, res) => {
+  try {
+    const { eventId, email } = req.body;
+    const user = await User.findOne({ email: email });
+    if (!user) return res.status(404).json({ message: "User not found!" });
+    const ws = await WorkshopAttendance.findOneAndUpdate(
+      {
+        eventId: eventId,
+        email: user.email,
+      },
+      {
+        attended: false,
+        attendedAt: null,
+      },
+      { new: true }
+    );
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/attendp", async (req, res) => {
+  try {
+    const { eventId, kriyaId } = req.body;
+    const user = await User.findOne({ kriyaId: `KRIYA${kriyaId}` });
+    if (!user) return res.status(404).json({ message: "User not found!" });
+    const p = await PaperAttendance.findOneAndUpdate(
+      {
+        eventId: eventId,
+        email: user.email,
+      },
+      {
+        attended: true,
+        attendedAt: new Date(),
+      },
+      { new: true }
+    );
+    if (!p) {
+      const p = await PaperAttendance.create({
+        eventId: eventId,
+        email: user.email,
+        attended: true,
+        attendedAt: new Date(),
+      });
+      return res.status(200).json({ p, success: true });
+    }
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/attend-falsep", async (req, res) => {
+  try {
+    const { eventId, email } = req.body;
+    const user = await User.findOne({ email: email });
+    if (!user) return res.status(404).json({ message: "User not found!" });
+    const p = await PaperAttendance.findOneAndUpdate(
+      {
+        eventId: eventId,
+        email: user.email,
+      },
+      {
+        attended: false,
+        attendedAt: null,
+      },
+      { new: true }
+    );
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.listen(3000, function() {
     console.log("Server started on port 3000");
